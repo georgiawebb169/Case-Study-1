@@ -105,4 +105,34 @@ from ranked r
 inner join menu m 
     on m.product_id=r.product_id 
 where rank_recent_order =1;
-  
+
+  // Which item was purchased just before the customer became a member?
+     // CTE to filter data for orders after join date 
+with before_join as (select 
+s.customer_id,
+order_date,
+product_id,
+join_date
+from sales s
+inner join members m
+    on m.customer_id=s.customer_id
+where order_date<join_date)
+
+    // CTE to rank purchases by date
+,ranked as( select 
+bj.customer_id,
+bj.order_date,
+bj.product_id,
+bj.join_date,
+rank() over(
+    partition by bj.customer_id
+    order by bj.order_date desc
+    ) as rank_recent_order
+from before_join bj)
+
+// select statement referencing the ctes
+select customer_id, product_name
+from ranked r
+inner join menu m 
+    on m.product_id=r.product_id 
+where rank_recent_order =1;
