@@ -1,0 +1,108 @@
+//What is the total amount each customer spent at the restaurant?
+
+select s.customer_id,
+sum(price) as Total_Spent
+from menu m
+inner join sales s
+    on m.product_id = s.product_id
+GROUP BY s.customer_id
+ORDER BY s.customer_id ASC;
+
+//How many days has each customer visited the restaurant?
+
+select s.customer_id, 
+count(distinct order_date) as number_of_days
+from sales s
+group by s.customer_id;
+
+//What was the first item from the menu purchased by each customer?
+
+    // CTE for ranking the products by order date 
+with ranked_orders as (
+    select customer_id,
+        product_id,
+        order_date,
+        dense_rank() over (partition by customer_id order by order_date ASC) AS ORDER_DATE_RANK
+from sales s
+)
+
+    // select statement using CTE 
+SELECT r.customer_id,
+m.product_name
+FROM ranked_orders r
+inner join menu m 
+    on m.product_id = r.product_id
+WHERE order_date_rank = 1;
+
+
+//What is the most purchased item on the menu and how many times was it purchased by all customers?
+select 
+count(s.product_id) as number_of_purchases,
+m.product_name
+from sales s
+inner join menu m 
+    on m.product_id=s.product_id
+group by m.product_name
+ORDER BY 
+  COUNT(order_date) DESC 
+LIMIT 1;
+
+
+//Which item was the most popular for each customer?
+
+    // CTE to count how many times a product purchased per customer 
+with 
+purchases_per_product_per_customer as (
+SELECT COUNT(PRODUCT_ID) AS NUMBER_OF_PURCHASES,
+customer_id,
+product_id
+FROM SALES S 
+GROUP BY CUSTOMER_ID, product_id
+),
+
+    // CTE to rank item popularity per customer
+ranked_items as ( 
+    select customer_id,
+    PRODUCT_ID,
+    rank() over (partition by customer_id order by number_of_purchases asc)
+   as purchaserank from purchases_per_product_per_customer)
+select customer_id r,
+m.product_name, 
+from ranked_items r
+inner join menu m
+    on m.product_id=r.product_id
+where purchaserank = 1;
+
+
+//Which item was purchased first by the customer after they became a member?
+
+    // CTE to filter data for orders after join date 
+with after_join as (select 
+s.customer_id,
+order_date,
+product_id,
+join_date
+from sales s
+inner join members m
+    on m.customer_id=s.customer_id
+where order_date>=join_date)
+
+    // CTE to rank purchases by date
+,ranked as( select 
+aj.customer_id,
+aj.order_date,
+aj.product_id,
+aj.join_date,
+rank() over(
+    partition by aj.customer_id
+    order by aj.order_date asc
+    ) as rank_recent_order
+from after_join aj)
+
+// select statement referencing the ctes
+select customer_id, product_name
+from ranked r
+inner join menu m 
+    on m.product_id=r.product_id 
+where rank_recent_order =1;
+  
